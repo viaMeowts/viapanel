@@ -16,7 +16,6 @@ import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
-import net.minecraft.util.Formatting;
 
 import java.lang.reflect.Field;
 import java.util.Comparator;
@@ -25,7 +24,11 @@ import java.util.List;
 public class ViaPanelCommand {
 
     private static final String CMD = "/viapanel";
-    private static final TextColor COLOR_NORMAL = TextColor.fromRgb(0xFCDE9D);
+    private static final TextColor COLOR_HEADER = TextColor.fromRgb(0xFBD06A);
+    private static final TextColor COLOR_OK = TextColor.fromRgb(0x0BDA51);
+    private static final TextColor COLOR_ERROR = TextColor.fromRgb(0xFF2C2C);
+    private static final TextColor COLOR_GRAY_LIGHT = TextColor.fromRgb(0xD9D0D5);
+    private static final TextColor COLOR_GRAY_DARK = TextColor.fromRgb(0xA89FA4);
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher,
                                 CommandRegistryAccess registryAccess,
@@ -56,7 +59,7 @@ public class ViaPanelCommand {
 
     private static int showMain(CommandContext<ServerCommandSource> ctx) {
         send(ctx, Text.literal(""));
-        send(ctx, Text.literal("  " + tr("installed_mods_title")).formatted(Formatting.GOLD));
+        send(ctx, Text.literal("  " + tr("installed_mods_title")).styled(s -> s.withColor(COLOR_HEADER)));
         send(ctx, Text.literal(""));
 
         List<ModContainer> mods = FabricLoader.getInstance().getAllMods().stream()
@@ -71,12 +74,12 @@ public class ViaPanelCommand {
             boolean hasAccess = supported && provider.hasPermission(ctx.getSource());
 
             MutableText line = Text.literal("  ");
-            line.append(Text.literal(supported ? "▸ " : "• ").formatted(supported ? Formatting.YELLOW : Formatting.DARK_GRAY));
+            line.append(Text.literal(supported ? "▸ " : "• ").styled(s -> s.withColor(supported ? COLOR_HEADER : COLOR_GRAY_DARK)));
 
             MutableText title = Text.literal(modName + " [" + modId + "]");
                 TextColor titleColor = supported
-                    ? (hasAccess ? COLOR_NORMAL : TextColor.fromFormatting(Formatting.RED))
-                    : TextColor.fromFormatting(Formatting.GRAY);
+                    ? (hasAccess ? COLOR_GRAY_LIGHT : COLOR_ERROR)
+                    : COLOR_GRAY_DARK;
                 title.styled(s -> s.withColor(titleColor));
 
             if (supported && hasAccess) {
@@ -107,9 +110,9 @@ public class ViaPanelCommand {
         send(ctx, Text.literal(""));
 
         for (ViaPanelSection section : provider.sections()) {
-            MutableText line = Text.literal("  ▸ ").formatted(Formatting.YELLOW)
+            MutableText line = Text.literal("  ▸ ").styled(s -> s.withColor(COLOR_HEADER))
                     .append(section.title().copy().styled(s -> s
-                    .withColor(COLOR_NORMAL)
+                    .withColor(COLOR_GRAY_LIGHT)
                             .withClickEvent(new ClickEvent.RunCommand(CMD + " " + modId + " " + section.id()))
                     .withHoverEvent(new HoverEvent.ShowText(Text.literal(tr("open_section"))))));
             send(ctx, line);
@@ -117,7 +120,7 @@ public class ViaPanelCommand {
 
         send(ctx, Text.literal(""));
         send(ctx, Text.literal("  ").append(Text.literal("⟳ " + tr("reload_config")).styled(s -> s
-            .withColor(Formatting.GOLD)
+            .withColor(COLOR_HEADER)
                 .withClickEvent(new ClickEvent.RunCommand(CMD + " reload " + modId))
             .withHoverEvent(new HoverEvent.ShowText(Text.literal(tr("reload_hover")))))));
         send(ctx, Text.literal(""));
@@ -136,13 +139,13 @@ public class ViaPanelCommand {
                 .findFirst().orElse(null);
 
         if (section == null) {
-            ctx.getSource().sendError(Text.literal(tr("unknown_section") + ": " + sectionId).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("unknown_section") + ": " + sectionId).styled(s -> s.withColor(COLOR_ERROR)));
             return 0;
         }
 
         Object config = provider.configInstance();
         if (config == null) {
-            ctx.getSource().sendError(Text.literal(tr("config_not_loaded")).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("config_not_loaded")).styled(s -> s.withColor(COLOR_ERROR)));
             return 0;
         }
 
@@ -154,43 +157,43 @@ public class ViaPanelCommand {
             try {
                 Field field = provider.configClass().getField(fieldName);
                 Object value = field.get(config);
-                MutableText line = Text.literal("  ").append(provider.fieldDisplayName(fieldName)).append(Text.literal(": ").styled(s -> s.withColor(COLOR_NORMAL)));
+                MutableText line = Text.literal("  ").append(provider.fieldDisplayName(fieldName)).append(Text.literal(": ").styled(s -> s.withColor(COLOR_GRAY_LIGHT)));
 
                 if (value instanceof Boolean bool) {
                     line.append(Text.literal(bool ? "[ON]" : "[OFF]").styled(s -> s
-                            .withColor(bool ? Formatting.GREEN : Formatting.RED)
+                            .withColor(bool ? COLOR_OK : COLOR_ERROR)
                             .withClickEvent(new ClickEvent.RunCommand(CMD + " toggle " + modId + " " + fieldName))
                             .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.toggleHintText(), null)))));
                 } else if (value instanceof Double d) {
                     line.append(Text.literal(String.valueOf(d)).styled(s -> s
-                            .withColor(COLOR_NORMAL)
+                            .withColor(COLOR_GRAY_LIGHT)
                             .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + d))
                             .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
                 } else if (value instanceof Integer i) {
                     line.append(Text.literal(String.valueOf(i)).styled(s -> s
-                            .withColor(COLOR_NORMAL)
+                            .withColor(COLOR_GRAY_LIGHT)
                             .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + i))
                             .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
                 } else if (value instanceof String str) {
                     String display = str.length() > 25 ? str.substring(0, 22) + "..." : str;
                     line.append(Text.literal("\"" + display + "\"").styled(s -> s
-                            .withColor(COLOR_NORMAL)
+                            .withColor(COLOR_GRAY_LIGHT)
                             .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + str))
                             .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), str)))));
                 } else {
-                    line.append(Text.literal("(" + tr("unsupported") + ")").formatted(Formatting.GRAY));
+                    line.append(Text.literal("(" + tr("unsupported") + ")").styled(s -> s.withColor(COLOR_GRAY_DARK)));
                 }
 
                 send(ctx, line);
             } catch (NoSuchFieldException | IllegalAccessException e) {
-                send(ctx, Text.literal("  " + fieldName + ": ").formatted(Formatting.GRAY)
-                        .append(Text.literal("(error)").formatted(Formatting.RED)));
+                send(ctx, Text.literal("  " + fieldName + ": ").styled(s -> s.withColor(COLOR_GRAY_DARK))
+                        .append(Text.literal("(error)").styled(s -> s.withColor(COLOR_ERROR))));
             }
         }
 
         send(ctx, Text.literal(""));
         send(ctx, Text.literal("  ◄ " + tr("back")).styled(s -> s
-                .withColor(Formatting.GOLD)
+                .withColor(COLOR_HEADER)
                 .withClickEvent(new ClickEvent.RunCommand(CMD + " " + modId))
             .withHoverEvent(new HoverEvent.ShowText(Text.literal(tr("back_hover"))))));
         send(ctx, Text.literal(""));
@@ -207,7 +210,7 @@ public class ViaPanelCommand {
 
         Object cfg = provider.configInstance();
         if (cfg == null) {
-            ctx.getSource().sendError(Text.literal(tr("config_not_loaded")).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("config_not_loaded")).styled(s -> s.withColor(COLOR_ERROR)));
             return 0;
         }
 
@@ -228,7 +231,7 @@ public class ViaPanelCommand {
             ctx.getSource().sendFeedback(
                     () -> provider.fieldDisplayName(fieldName).copy()
                             .append(Text.literal(": "))
-                            .append(Text.literal(newVal ? "ON" : "OFF").formatted(newVal ? Formatting.GREEN : Formatting.RED))
+                        .append(Text.literal(newVal ? "ON" : "OFF").styled(s -> s.withColor(newVal ? COLOR_OK : COLOR_ERROR)))
                             .append(provider.savedSuffixText()),
                     false
             );
@@ -236,7 +239,7 @@ public class ViaPanelCommand {
         } catch (NoSuchFieldException e) {
             ctx.getSource().sendError(provider.unknownFieldText());
         } catch (IllegalAccessException e) {
-            ctx.getSource().sendError(Text.literal(tr("cannot_access_field") + ": " + fieldName).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("cannot_access_field") + ": " + fieldName).styled(s -> s.withColor(COLOR_ERROR)));
         }
 
         return 0;
@@ -252,7 +255,7 @@ public class ViaPanelCommand {
 
         Object cfg = provider.configInstance();
         if (cfg == null) {
-            ctx.getSource().sendError(Text.literal(tr("config_not_loaded")).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("config_not_loaded")).styled(s -> s.withColor(COLOR_ERROR)));
             return 0;
         }
 
@@ -269,7 +272,7 @@ public class ViaPanelCommand {
             } else if (type == boolean.class) {
                 field.setBoolean(cfg, Boolean.parseBoolean(rawValue));
             } else {
-                ctx.getSource().sendError(Text.literal(tr("unsupported_field_type")).formatted(Formatting.RED));
+                ctx.getSource().sendError(Text.literal(tr("unsupported_field_type")).styled(s -> s.withColor(COLOR_ERROR)));
                 return 0;
             }
 
@@ -283,7 +286,7 @@ public class ViaPanelCommand {
             ctx.getSource().sendFeedback(
                     () -> provider.fieldDisplayName(fieldName).copy()
                             .append(Text.literal(" = "))
-                            .append(Text.literal(rawValue).styled(s -> s.withColor(COLOR_NORMAL)))
+                        .append(Text.literal(rawValue).styled(s -> s.withColor(COLOR_GRAY_LIGHT)))
                             .append(provider.savedSuffixText()),
                     false);
             return 1;
@@ -292,7 +295,7 @@ public class ViaPanelCommand {
         } catch (NumberFormatException e) {
             ctx.getSource().sendError(provider.invalidNumberText());
         } catch (IllegalAccessException e) {
-            ctx.getSource().sendError(Text.literal(tr("cannot_access_field") + ": " + fieldName).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("cannot_access_field") + ": " + fieldName).styled(s -> s.withColor(COLOR_ERROR)));
         }
 
         return 0;
@@ -312,13 +315,13 @@ public class ViaPanelCommand {
     private static int setGlobalLanguage(CommandContext<ServerCommandSource> ctx) {
         String code = StringArgumentType.getString(ctx, "code").trim().toLowerCase();
         if (!"ru".equals(code) && !"en".equals(code)) {
-            ctx.getSource().sendError(Text.literal(tr("invalid_lang_code")).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("invalid_lang_code")).styled(s -> s.withColor(COLOR_ERROR)));
             return 0;
         }
 
         ViaPanelApi.applyGlobalLanguageToAll(code, ctx.getSource());
         ctx.getSource().sendFeedback(
-                () -> Text.literal(tr("lang_applied") + ": " + code).styled(s -> s.withColor(COLOR_NORMAL)),
+                () -> Text.literal(tr("lang_applied") + ": " + code).styled(s -> s.withColor(COLOR_GRAY_LIGHT)),
                 false
         );
         return 1;
@@ -329,7 +332,7 @@ public class ViaPanelCommand {
         hover.append(Text.literal("\n"));
         hover.append(action.copy());
         if (rawValue != null && !rawValue.isBlank()) {
-            hover.append(Text.literal("\n" + rawValue).formatted(Formatting.GRAY));
+            hover.append(Text.literal("\n" + rawValue).styled(s -> s.withColor(COLOR_GRAY_DARK)));
         }
         return hover;
     }
@@ -337,11 +340,11 @@ public class ViaPanelCommand {
     private static ViaPanelProvider requireProvider(CommandContext<ServerCommandSource> ctx, String modId) {
         ViaPanelProvider provider = ViaPanelApi.getProvider(modId);
         if (provider == null) {
-            ctx.getSource().sendError(Text.literal(tr("mod_no_api") + ": " + modId).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("mod_no_api") + ": " + modId).styled(s -> s.withColor(COLOR_ERROR)));
             return null;
         }
         if (!provider.hasPermission(ctx.getSource())) {
-            ctx.getSource().sendError(Text.literal(tr("no_permission_panel") + ": " + modId).formatted(Formatting.RED));
+            ctx.getSource().sendError(Text.literal(tr("no_permission_panel") + ": " + modId).styled(s -> s.withColor(COLOR_ERROR)));
             return null;
         }
         return provider;
