@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "viapanel",
+  "version": "${version}",
+  "name": "viaPanel",
+  "description": "Shared per-mod chat configuration panel for via mods.",
+  "authors": [
+    "viaMeowts"
+  ],
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "server": [
+      "com.viameowts.viapanel.ViaPanelMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21"
+  }
+}
