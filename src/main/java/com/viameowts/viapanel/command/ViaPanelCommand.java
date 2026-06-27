@@ -3,7 +3,10 @@ package com.viameowts.viapanel.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.viameowts.viapanel.ViaPanelConfig;
 import com.viameowts.viapanel.api.ViaPanelApi;
+import com.viameowts.viapanel.ViaPanelMod;
+import com.viameowts.viapanel.ViaPanelPermissionHelper;
 import com.viameowts.viapanel.api.ViaPanelProvider;
 import com.viameowts.viapanel.api.ViaPanelSection;
 import net.fabricmc.loader.api.FabricLoader;
@@ -24,11 +27,11 @@ import java.util.List;
 public class ViaPanelCommand {
 
     private static final String CMD = "/viapanel";
-    private static final TextColor COLOR_HEADER = TextColor.fromRgb(0xFBD06A);
-    private static final TextColor COLOR_OK = TextColor.fromRgb(0x0BDA51);
-    private static final TextColor COLOR_ERROR = TextColor.fromRgb(0xFF2C2C);
+    private static final TextColor COLOR_HEADER = TextColor.fromRgb(0xFFC64C);
+    private static final TextColor COLOR_OK = TextColor.fromRgb(0x98FB98);
+    private static final TextColor COLOR_ERROR = TextColor.fromRgb(0xFF5555);
     private static final TextColor COLOR_GRAY_LIGHT = TextColor.fromRgb(0xD9D0D5);
-    private static final TextColor COLOR_GRAY_DARK = TextColor.fromRgb(0xA89FA4);
+    private static final TextColor COLOR_GRAY_DARK = TextColor.fromRgb(0xB0C4DE);
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher,
                                 CommandRegistryAccess registryAccess,
@@ -52,6 +55,7 @@ public class ViaPanelCommand {
                         .then(CommandManager.argument("mod", StringArgumentType.word())
                         .executes(ViaPanelCommand::reloadModConfig)))
                 .then(CommandManager.literal("lang")
+                    .requires(ViaPanelCommand::hasGlobalAdminPermission)
                     .then(CommandManager.argument("code", StringArgumentType.word())
                         .executes(ViaPanelCommand::setGlobalLanguage)))
         );
@@ -97,7 +101,46 @@ public class ViaPanelCommand {
         }
 
         send(ctx, Text.literal(""));
+        send(ctx, buildGlobalLanguageLine(ctx.getSource()));
+
+        send(ctx, Text.literal(""));
         return 1;
+    }
+
+    private static MutableText buildGlobalLanguageLine(ServerCommandSource source) {
+        boolean canChange = hasGlobalAdminPermission(source);
+        String current = ViaPanelApi.getGlobalLanguage();
+
+        MutableText line = Text.literal("  ");
+        line.append(Text.literal("▸ ").styled(s -> s.withColor(COLOR_HEADER)));
+        line.append(Text.literal(tr("global_language_label") + ": ").styled(s -> s.withColor(COLOR_GRAY_LIGHT)));
+
+        line.append(languageButton("en", current, canChange));
+        line.append(Text.literal(" ").styled(s -> s.withColor(COLOR_GRAY_DARK)));
+        line.append(languageButton("ru", current, canChange));
+
+        if (!canChange) {
+            line.append(Text.literal("  [" + tr("global_language_locked") + "]").styled(s -> s.withColor(COLOR_GRAY_DARK)));
+        }
+
+        return line;
+    }
+
+    private static MutableText languageButton(String code, String current, boolean canChange) {
+        boolean active = code.equalsIgnoreCase(current);
+        TextColor color = active ? COLOR_OK : COLOR_GRAY_LIGHT;
+        MutableText button = Text.literal("[" + code.toUpperCase() + "]").styled(s -> s.withColor(color));
+
+        if (canChange) {
+            button.styled(s -> s
+                    .withClickEvent(new ClickEvent.RunCommand(CMD + " lang " + code))
+                    .withHoverEvent(new HoverEvent.ShowText(Text.literal(tr("global_language_click_hint")))));
+        } else {
+            button.styled(s -> s
+                    .withHoverEvent(new HoverEvent.ShowText(Text.literal(tr("global_language_permission_hint")))));
+        }
+
+        return button;
     }
 
     private static int showModMain(CommandContext<ServerCommandSource> ctx) {
@@ -280,7 +323,9 @@ public class ViaPanelCommand {
             provider.onFieldUpdated(fieldName, ctx.getSource());
 
             if ("defaultLanguage".equals(fieldName)) {
-                ViaPanelApi.applyGlobalLanguageToAll(rawValue, ctx.getSource());
+                if (hasGlobalAdminPermission(ctx.getSource())) {
+                    ViaPanelApi.applyGlobalLanguageToAll(rawValue, ctx.getSource());
+                }
             }
 
             ctx.getSource().sendFeedback(
@@ -337,6 +382,11 @@ public class ViaPanelCommand {
         return hover;
     }
 
+    private static boolean hasGlobalAdminPermission(ServerCommandSource source) {
+        ViaPanelConfig cfg = ViaPanelMod.CONFIG != null ? ViaPanelMod.CONFIG : new ViaPanelConfig();
+        return ViaPanelPermissionHelper.checkPermission(source, cfg.globalLanguagePermission, cfg.globalLanguageOpLevel);
+    }
+
     private static ViaPanelProvider requireProvider(CommandContext<ServerCommandSource> ctx, String modId) {
         ViaPanelProvider provider = ViaPanelApi.getProvider(modId);
         if (provider == null) {
@@ -371,6 +421,10 @@ public class ViaPanelCommand {
             case "no_permission_panel" -> ru ? "Нет прав для панели" : "No permission for panel";
             case "invalid_lang_code" -> ru ? "Неверный код языка. Используй: ru или en." : "Invalid language code. Use: ru or en.";
             case "lang_applied" -> ru ? "Глобальный язык применён" : "Global language applied";
+            case "global_language_label" -> ru ? "Глобальный язык" : "Global language";
+            case "global_language_locked" -> ru ? "недостаточно прав" : "insufficient permission";
+            case "global_language_click_hint" -> ru ? "Нажмите, чтобы применить язык ко всем модам" : "Click to apply language to all mods";
+            case "global_language_permission_hint" -> ru ? "Недостаточно прав для глобального переключения языка" : "Insufficient permission for global language switch";
             default -> key;
         };
     }

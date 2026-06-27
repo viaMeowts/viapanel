@@ -1,4 +1,28 @@
-﻿.gradle/
+# Gradle
+.gradle/
 build/
 out/
-*.class
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# macOS
+.DS_Store
+
+# Fabric Loom
+.loom-cache/
+
+# Temp files
+tmpclaude*
+build_err.txt
