@@ -8,6 +8,7 @@ import com.viameowts.viapanel.api.ViaPanelApi;
 import com.viameowts.viapanel.ViaPanelMod;
 import com.viameowts.viapanel.ViaPanelPermissionHelper;
 import com.viameowts.viapanel.api.ViaPanelProvider;
+import com.viameowts.viapanel.api.ViaPanelIntrospector;
 import com.viameowts.viapanel.api.ViaPanelSection;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
@@ -197,34 +198,17 @@ public class ViaPanelCommand {
         send(ctx, Text.literal(""));
 
         for (String fieldName : section.fields()) {
+            ViaPanelIntrospector.FieldMeta meta =
+                    ViaPanelIntrospector.field(provider.configClass(), fieldName);
             try {
-                Field field = provider.configClass().getField(fieldName);
-                Object value = field.get(config);
                 MutableText line = Text.literal("  ").append(provider.fieldDisplayName(fieldName)).append(Text.literal(": ").styled(s -> s.withColor(COLOR_GRAY_LIGHT)));
 
-                if (value instanceof Boolean bool) {
-                    line.append(Text.literal(bool ? "[ON]" : "[OFF]").styled(s -> s
-                            .withColor(bool ? COLOR_OK : COLOR_ERROR)
-                            .withClickEvent(new ClickEvent.RunCommand(CMD + " toggle " + modId + " " + fieldName))
-                            .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.toggleHintText(), null)))));
-                } else if (value instanceof Double d) {
-                    line.append(Text.literal(String.valueOf(d)).styled(s -> s
-                            .withColor(COLOR_GRAY_LIGHT)
-                            .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + d))
-                            .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
-                } else if (value instanceof Integer i) {
-                    line.append(Text.literal(String.valueOf(i)).styled(s -> s
-                            .withColor(COLOR_GRAY_LIGHT)
-                            .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + i))
-                            .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
-                } else if (value instanceof String str) {
-                    String display = str.length() > 25 ? str.substring(0, 22) + "..." : str;
-                    line.append(Text.literal("\"" + display + "\"").styled(s -> s
-                            .withColor(COLOR_GRAY_LIGHT)
-                            .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + str))
-                            .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), str)))));
+                if (meta != null) {
+                    appendAnnotatedValue(ctx, provider, config, meta, line);
                 } else {
-                    line.append(Text.literal("(" + tr("unsupported") + ")").styled(s -> s.withColor(COLOR_GRAY_DARK)));
+                    Field field = provider.configClass().getField(fieldName);
+                    Object value = field.get(config);
+                    appendLegacyValue(ctx, provider, fieldName, value, line);
                 }
 
                 send(ctx, line);
@@ -242,6 +226,109 @@ public class ViaPanelCommand {
         send(ctx, Text.literal(""));
 
         return 1;
+    }
+
+    private static void appendAnnotatedValue(CommandContext<ServerCommandSource> ctx, ViaPanelProvider provider,
+                                             Object config, ViaPanelIntrospector.FieldMeta meta,
+                                             MutableText line) throws IllegalAccessException {
+        String modId = provider.modId();
+        Class<?> t = meta.type();
+        Text langDesc = meta.descFor(ViaPanelApi.getGlobalLanguage());
+        if (langDesc.getString().isBlank()) {
+            langDesc = provider.fieldDescription(meta.key());
+        }
+        final Text desc = langDesc;
+
+        if (t == boolean.class) {
+            boolean v = meta.field().getBoolean(config);
+            line.append(Text.literal(v ? "[ON]" : "[OFF]").styled(s -> s
+                    .withColor(v ? COLOR_OK : COLOR_ERROR)
+                    .withClickEvent(new ClickEvent.RunCommand(CMD + " toggle " + modId + " " + meta.key()))
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(desc, provider.toggleHintText(), null)))));
+        } else if (t.isEnum() && !meta.secret()) {
+            String current = ((Enum<?>) meta.field().get(config)).name();
+            String next = ViaPanelIntrospector.nextEnumValue(config, meta);
+            StringBuilder values = new StringBuilder();
+            for (Object c : t.getEnumConstants()) {
+                if (!values.isEmpty()) {
+                    values.append(" / ");
+                }
+                values.append(((Enum<?>) c).name());
+            }
+            String hoverExtra = next != null
+                    ? tr("enum_cycle") + " -> " + next
+                    : tr("enum_options") + ": " + values;
+            line.append(Text.literal(current).styled(s -> s
+                    .withColor(COLOR_GRAY_LIGHT)
+                    .withClickEvent(next != null
+                            ? new ClickEvent.RunCommand(CMD + " set " + modId + " " + meta.key() + " " + next)
+                            : null)
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(desc,
+                            Text.literal(hoverExtra), null)))));
+        } else {
+            String display = ViaPanelIntrospector.displayValue(config, meta);
+            String suggest = CMD + " set " + modId + " " + meta.key()
+                    + (meta.secret() ? " " : " " + ViaPanelIntrospector.suggestValue(config, meta));
+            String shown = display.length() > 25 ? display.substring(0, 22) + "..." : display;
+            if (!meta.secret() && t == String.class) {
+                shown = "\"" + shown + "\"";
+            }
+            Text rangeHint = meta.bounded()
+                    ? Text.literal(tr("range") + " [" +
+                            (Double.isNaN(meta.min()) ? "-inf" : ViaPanelIntrospector.formatNumber(meta.min()))
+                            + " .. " +
+                            (Double.isNaN(meta.max()) ? "+inf" : ViaPanelIntrospector.formatNumber(meta.max())) + "]")
+                    : null;
+            MutableText hoverBase = rangeHint != null ? desc.copy().append("\n").append(rangeHint) : desc.copy();
+            hoverBase.append("\n").append(provider.editHintText());
+            if (!meta.secret() && !suggest.endsWith(" ")) {
+                hoverBase.append("\n").append(Text.literal(ViaPanelIntrospector.suggestValue(config, meta))
+                        .styled(s2 -> s2.withColor(COLOR_GRAY_DARK)));
+            }
+            line.append(Text.literal(shown).styled(s -> s
+                    .withColor(COLOR_GRAY_LIGHT)
+                    .withClickEvent(new ClickEvent.SuggestCommand(suggest))
+                    .withHoverEvent(new HoverEvent.ShowText(hoverBase))));
+        }
+    }
+
+    private static void appendLegacyValue(CommandContext<ServerCommandSource> ctx, ViaPanelProvider provider,
+                                          String fieldName, Object value, MutableText line) {
+        String modId = provider.modId();
+        if (value instanceof Boolean bool) {
+            line.append(Text.literal(bool ? "[ON]" : "[OFF]").styled(s -> s
+                    .withColor(bool ? COLOR_OK : COLOR_ERROR)
+                    .withClickEvent(new ClickEvent.RunCommand(CMD + " toggle " + modId + " " + fieldName))
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.toggleHintText(), null)))));
+        } else if (value instanceof Double d) {
+            line.append(Text.literal(String.valueOf(d)).styled(s -> s
+                    .withColor(COLOR_GRAY_LIGHT)
+                    .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + d))
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
+        } else if (value instanceof Integer i) {
+            line.append(Text.literal(String.valueOf(i)).styled(s -> s
+                    .withColor(COLOR_GRAY_LIGHT)
+                    .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + i))
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
+        } else if (value instanceof Float f) {
+            line.append(Text.literal(String.valueOf(f)).styled(s -> s
+                    .withColor(COLOR_GRAY_LIGHT)
+                    .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + f))
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
+        } else if (value instanceof Long l) {
+            line.append(Text.literal(String.valueOf(l)).styled(s -> s
+                    .withColor(COLOR_GRAY_LIGHT)
+                    .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + l))
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), null)))));
+        } else if (value instanceof String str) {
+            String display = str.length() > 25 ? str.substring(0, 22) + "..." : str;
+            line.append(Text.literal("\"" + display + "\"").styled(s -> s
+                    .withColor(COLOR_GRAY_LIGHT)
+                    .withClickEvent(new ClickEvent.SuggestCommand(CMD + " set " + modId + " " + fieldName + " " + str))
+                    .withHoverEvent(new HoverEvent.ShowText(buildFieldHover(provider.fieldDescription(fieldName), provider.editHintText(), str)))));
+        } else {
+            line.append(Text.literal("(" + tr("unsupported") + ")").styled(s -> s.withColor(COLOR_GRAY_DARK)));
+        }
     }
 
     private static int toggleField(CommandContext<ServerCommandSource> ctx) {
@@ -267,7 +354,9 @@ public class ViaPanelCommand {
             boolean current = field.getBoolean(cfg);
             field.setBoolean(cfg, !current);
 
-            saveConfig(cfg);
+            if (!saveConfig(cfg, ctx.getSource())) {
+                return 0;
+            }
             provider.onFieldUpdated(fieldName, ctx.getSource());
 
             boolean newVal = !current;
@@ -305,13 +394,25 @@ public class ViaPanelCommand {
         try {
             Field field = provider.configClass().getField(fieldName);
             Class<?> type = field.getType();
+            ViaPanelIntrospector.FieldMeta meta =
+                    ViaPanelIntrospector.field(provider.configClass(), fieldName);
 
-            if (type == String.class) {
+            if (meta != null) {
+                Text error = ViaPanelIntrospector.applyValue(cfg, meta, rawValue);
+                if (error != null) {
+                    ctx.getSource().sendError(error.copy().styled(s -> s.withColor(COLOR_ERROR)));
+                    return 0;
+                }
+            } else if (type == String.class) {
                 field.set(cfg, rawValue);
             } else if (type == double.class) {
                 field.setDouble(cfg, Double.parseDouble(rawValue));
+            } else if (type == float.class) {
+                field.setFloat(cfg, Float.parseFloat(rawValue));
             } else if (type == int.class) {
                 field.setInt(cfg, Integer.parseInt(rawValue));
+            } else if (type == long.class) {
+                field.setLong(cfg, Long.parseLong(rawValue));
             } else if (type == boolean.class) {
                 field.setBoolean(cfg, Boolean.parseBoolean(rawValue));
             } else {
@@ -319,19 +420,16 @@ public class ViaPanelCommand {
                 return 0;
             }
 
-            saveConfig(cfg);
+            if (!saveConfig(cfg, ctx.getSource())) {
+                return 0;
+            }
             provider.onFieldUpdated(fieldName, ctx.getSource());
 
-            if ("defaultLanguage".equals(fieldName)) {
-                if (hasGlobalAdminPermission(ctx.getSource())) {
-                    ViaPanelApi.applyGlobalLanguageToAll(rawValue, ctx.getSource());
-                }
-            }
-
+            String shownValue = meta != null && meta.secret() ? "***" : rawValue;
             ctx.getSource().sendFeedback(
                     () -> provider.fieldDisplayName(fieldName).copy()
                             .append(Text.literal(" = "))
-                        .append(Text.literal(rawValue).styled(s -> s.withColor(COLOR_GRAY_LIGHT)))
+                        .append(Text.literal(shownValue).styled(s -> s.withColor(COLOR_GRAY_LIGHT)))
                             .append(provider.savedSuffixText()),
                     false);
             return 1;
@@ -417,6 +515,10 @@ public class ViaPanelCommand {
             case "back_hover" -> ru ? "Назад к панели мода" : "Back to mod panel";
             case "cannot_access_field" -> ru ? "Нет доступа к полю" : "Cannot access field";
             case "unsupported_field_type" -> ru ? "Неподдерживаемый тип поля." : "Unsupported field type.";
+            case "enum_options" -> ru ? "Варианты" : "Options";
+            case "enum_cycle" -> ru ? "Нажмите, чтобы переключить на" : "Click to switch to";
+            case "range" -> ru ? "Диапазон:" : "Range:";
+            case "save_failed" -> ru ? "Ошибка сохранения конфига: " : "Config save failed: ";
             case "mod_no_api" -> ru ? "Мод не предоставляет viaPanel API" : "Mod does not expose viaPanel API";
             case "no_permission_panel" -> ru ? "Нет прав для панели" : "No permission for panel";
             case "invalid_lang_code" -> ru ? "Неверный код языка. Используй: ru или en." : "Invalid language code. Use: ru or en.";
@@ -429,10 +531,17 @@ public class ViaPanelCommand {
         };
     }
 
-    private static void saveConfig(Object config) {
+    private static boolean saveConfig(Object config, ServerCommandSource source) {
         try {
             config.getClass().getMethod("save").invoke(config);
-        } catch (Exception ignored) {
+            return true;
+        } catch (NoSuchMethodException e) {
+            return true;
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            source.sendError(Text.literal(tr("save_failed") + cause.getMessage())
+                    .styled(s -> s.withColor(COLOR_ERROR)));
+            return false;
         }
     }
 
