@@ -53,7 +53,7 @@ public final class ViaPanelApi {
         globalLanguage = normalized;
     }
 
-    public static void applyGlobalLanguageToAll(String languageCode, net.minecraft.server.command.ServerCommandSource source) {
+    public static void applyGlobalLanguageToAll(String languageCode, net.minecraft.commands.CommandSourceStack source) {
         setGlobalLanguage(languageCode);
         for (ViaPanelProvider provider : getProviders()) {
             provider.applyGlobalLanguage(globalLanguage, source);

@@ -1,18 +1,18 @@
 package com.viameowts.viapanel.api;
 
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
 public interface ViaPanelProvider {
     String modId();
 
-    Text modDisplayName();
+    Component modDisplayName();
 
-    Text panelTitle();
+    Component panelTitle();
 
-    boolean hasPermission(ServerCommandSource source);
+    boolean hasPermission(CommandSourceStack source);
 
     Class<?> configClass();
 
@@ -20,48 +20,48 @@ public interface ViaPanelProvider {
 
     List<ViaPanelSection> sections();
 
-    default Text fieldDisplayName(String fieldName) {
-        return Text.literal(fieldName);
+    default Component fieldDisplayName(String fieldName) {
+        return Component.literal(fieldName);
     }
 
-    default Text fieldDescription(String fieldName) {
-        return Text.literal(fieldName);
+    default Component fieldDescription(String fieldName) {
+        return Component.literal(fieldName);
     }
 
-    default Text toggleHintText() {
-        return Text.literal("Click to toggle");
+    default Component toggleHintText() {
+        return Component.literal("Click to toggle");
     }
 
-    default Text editHintText() {
-        return Text.literal("Click to edit");
+    default Component editHintText() {
+        return Component.literal("Click to edit");
     }
 
-    default Text savedSuffixText() {
-        return Text.literal(" (saved)");
+    default Component savedSuffixText() {
+        return Component.literal(" (saved)");
     }
 
-    default Text fieldNotBooleanText() {
-        return Text.literal("This field is not a boolean.");
+    default Component fieldNotBooleanText() {
+        return Component.literal("This field is not a boolean.");
     }
 
-    default Text unknownFieldText() {
-        return Text.literal("Unknown config field.");
+    default Component unknownFieldText() {
+        return Component.literal("Unknown config field.");
     }
 
-    default Text invalidNumberText() {
-        return Text.literal("Invalid number.");
+    default Component invalidNumberText() {
+        return Component.literal("Invalid number.");
     }
 
-    default void reload(ServerCommandSource source) {
+    default void reload(CommandSourceStack source) {
     }
 
-    default Text reloadDoneText() {
-        return Text.literal("Config reloaded successfully.");
+    default Component reloadDoneText() {
+        return Component.literal("Config reloaded successfully.");
     }
 
-    default void onFieldUpdated(String fieldName, ServerCommandSource source) {
+    default void onFieldUpdated(String fieldName, CommandSourceStack source) {
     }
 
-    default void applyGlobalLanguage(String languageCode, ServerCommandSource source) {
+    default void applyGlobalLanguage(String languageCode, CommandSourceStack source) {
     }
 }

@@ -1,11 +1,10 @@
 package com.viameowts.viapanel;
 
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.command.permission.LeveledPermissionPredicate;
-import net.minecraft.command.permission.PermissionLevel;
-import net.minecraft.command.permission.PermissionPredicate;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 
 import java.lang.reflect.Method;
 import java.util.UUID;
@@ -60,7 +59,7 @@ public final class ViaPanelPermissionHelper {
         }
     }
 
-    public static boolean checkPermission(ServerCommandSource source, String permissionNode, int opFallbackLevel) {
+    public static boolean checkPermission(CommandSourceStack source, String permissionNode, int opFallbackLevel) {
         if (source == null) {
             return false;
         }
@@ -70,8 +69,8 @@ public final class ViaPanelPermissionHelper {
             return hasOpLevel(source, opFallbackLevel);
         }
 
-        if (source.getEntity() instanceof ServerPlayerEntity player) {
-            if (hasLuckPermsPermission(player.getUuid(), node)) {
+        if (source.getEntity() instanceof ServerPlayer player) {
+            if (hasLuckPermsPermission(player.getUUID(), node)) {
                 return true;
             }
         }
@@ -79,13 +78,9 @@ public final class ViaPanelPermissionHelper {
         return hasOpLevel(source, opFallbackLevel);
     }
 
-    public static boolean hasOpLevel(ServerCommandSource source, int opLevel) {
-        return source != null && hasOpLevel(source.getPermissions(), opLevel);
-    }
-
-    private static boolean hasOpLevel(PermissionPredicate predicate, int opLevel) {
-        return predicate instanceof LeveledPermissionPredicate leveled
-                && leveled.getLevel().isAtLeast(PermissionLevel.fromLevel(opLevel));
+    public static boolean hasOpLevel(CommandSourceStack source, int opLevel) {
+        return source != null && opLevel >= 0
+                && source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(opLevel)));
     }
 
     private static boolean hasLuckPermsPermission(UUID uuid, String permissionNode) {

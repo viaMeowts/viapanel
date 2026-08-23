@@ -1,6 +1,6 @@
 package com.viameowts.viapanel.api;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ViaPanelIntrospector {
 
     /** Immutable metadata for one annotated field. */
-    public record FieldMeta(String key, Class<?> type, Text name, Text nameRu, Text desc, Text descRu,
+    public record FieldMeta(String key, Class<?> type, Component name, Component nameRu, Component desc, Component descRu,
                             String sectionId, double min, double max, int order, boolean secret, Field field) {
 
         public boolean bounded() {
@@ -27,8 +27,8 @@ public final class ViaPanelIntrospector {
         }
 
         /** Name resolved for the given global language code ("ru"/"en"). */
-        public Text nameFor(String lang) {
-            Text ru = nameRu();
+        public Component nameFor(String lang) {
+            Component ru = nameRu();
             if ("ru".equalsIgnoreCase(lang) && ru != null && !ru.getString().isBlank()) {
                 return ru;
             }
@@ -36,8 +36,8 @@ public final class ViaPanelIntrospector {
         }
 
         /** Description resolved for the given global language code ("ru"/"en"). */
-        public Text descFor(String lang) {
-            Text ru = descRu();
+        public Component descFor(String lang) {
+            Component ru = descRu();
             if ("ru".equalsIgnoreCase(lang) && ru != null && !ru.getString().isBlank()) {
                 return ru;
             }
@@ -46,7 +46,7 @@ public final class ViaPanelIntrospector {
     }
 
     /** Immutable metadata for one section (ordered fields). */
-    public record SectionMeta(String id, Text title, List<FieldMeta> fields) {
+    public record SectionMeta(String id, Component title, List<FieldMeta> fields) {
     }
 
     private static final Map<Class<?>, List<FieldMeta>> CACHE = new ConcurrentHashMap<>();
@@ -87,7 +87,7 @@ public final class ViaPanelIntrospector {
         List<SectionMeta> out = new ArrayList<>(grouped.size());
         grouped.forEach((id, list) -> {
             list.sort(Comparator.comparingInt(FieldMeta::order));
-            out.add(new SectionMeta(id, Text.literal(titleize(id)), List.copyOf(list)));
+            out.add(new SectionMeta(id, Component.literal(titleize(id)), List.copyOf(list)));
         });
         return List.copyOf(out);
     }
@@ -96,7 +96,7 @@ public final class ViaPanelIntrospector {
      * Parses {@code raw}, validates it against the field metadata and writes it into
      * {@code config}. Returns null on success or a localized error text.
      */
-    public static Text applyValue(Object config, FieldMeta meta, String raw) {
+    public static Component applyValue(Object config, FieldMeta meta, String raw) {
         Class<?> t = meta.type();
         try {
             Field f = meta.field();
@@ -148,7 +148,7 @@ public final class ViaPanelIntrospector {
         } catch (NumberFormatException e) {
             return t.isEnum() ? invalidEnum(t) : invalidNumber();
         } catch (IllegalAccessException e) {
-            return Text.literal("Cannot access field: " + meta.key());
+            return Component.literal("Cannot access field: " + meta.key());
         }
     }
 
@@ -232,12 +232,12 @@ public final class ViaPanelIntrospector {
                     continue;
                 }
                 String key = f.getName();
-                Text name = ann.value().isBlank()
+                Component name = ann.value().isBlank()
                         ? humanize(key)
-                        : Text.literal(ann.value());
-                Text nameRu = ann.valueRu().isBlank() ? null : Text.literal(ann.valueRu());
-                Text desc = Text.literal(ann.desc());
-                Text descRu = ann.descRu().isBlank() ? null : Text.literal(ann.descRu());
+                        : Component.literal(ann.value());
+                Component nameRu = ann.valueRu().isBlank() ? null : Component.literal(ann.valueRu());
+                Component desc = Component.literal(ann.desc());
+                Component descRu = ann.descRu().isBlank() ? null : Component.literal(ann.descRu());
                 out.add(new FieldMeta(key, f.getType(), name, nameRu, desc, descRu, ann.section(),
                         ann.min(), ann.max(), ann.order(), ann.secret(), f));
             }
@@ -250,7 +250,7 @@ public final class ViaPanelIntrospector {
                 || t == double.class || t == String.class || t.isEnum();
     }
 
-    private static Text humanize(String key) {
+    private static Component humanize(String key) {
         StringBuilder sb = new StringBuilder();
         for (String w : key.split("(?<=[a-z0-9])(?=[A-Z])|[_\\s]+")) {
             if (w.isEmpty()) {
@@ -261,7 +261,7 @@ public final class ViaPanelIntrospector {
             }
             sb.append(Character.toLowerCase(w.charAt(0))).append(w.substring(1));
         }
-        return Text.literal(sb.isEmpty() ? key : sb.toString());
+        return Component.literal(sb.isEmpty() ? key : sb.toString());
     }
 
     private static Boolean parseBoolean(String raw) {
@@ -281,23 +281,23 @@ public final class ViaPanelIntrospector {
         return null;
     }
 
-    private static Text outOfRange(FieldMeta meta, double attempted) {
+    private static Component outOfRange(FieldMeta meta, double attempted) {
         double lo = Double.isNaN(meta.min()) ? Double.NEGATIVE_INFINITY : meta.min();
         double hi = Double.isNaN(meta.max()) ? Double.POSITIVE_INFINITY : meta.max();
         String range = (Double.isNaN(meta.min()) ? "-inf" : formatNumber(lo))
                 + " .. " + (Double.isNaN(meta.max()) ? "+inf" : formatNumber(hi));
-        return Text.literal("Value " + formatNumber(attempted) + " is out of range [" + range + "]");
+        return Component.literal("Value " + formatNumber(attempted) + " is out of range [" + range + "]");
     }
 
-    private static Text invalidNumber() {
-        return Text.literal("Not a valid number.");
+    private static Component invalidNumber() {
+        return Component.literal("Not a valid number.");
     }
 
-    private static Text invalidBoolean() {
-        return Text.literal("Not a valid boolean. Use true/false.");
+    private static Component invalidBoolean() {
+        return Component.literal("Not a valid boolean. Use true/false.");
     }
 
-    private static Text invalidEnum(Class<?> enumClass) {
+    private static Component invalidEnum(Class<?> enumClass) {
         StringBuilder sb = new StringBuilder("Unknown value. Options: ");
         Object[] constants = enumClass.getEnumConstants();
         for (int i = 0; i < constants.length; i++) {
@@ -306,10 +306,10 @@ public final class ViaPanelIntrospector {
             }
             sb.append(((Enum<?>) constants[i]).name());
         }
-        return Text.literal(sb.toString());
+        return Component.literal(sb.toString());
     }
 
-    private static Text unsupportedType() {
-        return Text.literal("Unsupported field type.");
+    private static Component unsupportedType() {
+        return Component.literal("Unsupported field type.");
     }
 }

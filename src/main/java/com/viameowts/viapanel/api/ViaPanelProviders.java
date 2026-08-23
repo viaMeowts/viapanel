@@ -2,8 +2,8 @@ package com.viameowts.viapanel.api;
 
 import com.viameowts.viapanel.ViaPanelMod;
 import com.viameowts.viapanel.ViaPanelPermissionHelper;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -31,44 +31,44 @@ public final class ViaPanelProviders {
     }
 
     public static Builder builder(String modId, String displayName, Object configInstance) {
-        return new Builder(modId, Text.literal(displayName), configInstance);
+        return new Builder(modId, Component.literal(displayName), configInstance);
     }
 
-    public static Builder builder(String modId, Text displayName, Object configInstance) {
+    public static Builder builder(String modId, Component displayName, Object configInstance) {
         return new Builder(modId, displayName, configInstance);
     }
 
     public static final class Builder {
         private final String modId;
-        private final Text displayName;
+        private final Component displayName;
         private final Object configInstance;
-        private Text panelTitle;
-        private Predicate<ServerCommandSource> permission =
+        private Component panelTitle;
+        private Predicate<CommandSourceStack> permission =
                 src -> src != null && ViaPanelPermissionHelper.hasOpLevel(src, 2);
-        private BiConsumer<String, ServerCommandSource> onFieldUpdated;
+        private BiConsumer<String, CommandSourceStack> onFieldUpdated;
         private Consumer<String> languageHook;
         private Runnable onReload;
 
-        private Builder(String modId, Text displayName, Object configInstance) {
+        private Builder(String modId, Component displayName, Object configInstance) {
             this.modId = modId;
             this.displayName = displayName;
             this.configInstance = configInstance;
         }
 
         /** Title of the panel screen. Default: "{displayName} Settings". */
-        public Builder panelTitle(Text title) {
+        public Builder panelTitle(Component title) {
             this.panelTitle = title;
             return this;
         }
 
         /** Access check for the whole panel. Default: OP level 2. */
-        public Builder permission(Predicate<ServerCommandSource> permission) {
+        public Builder permission(Predicate<CommandSourceStack> permission) {
             this.permission = permission;
             return this;
         }
 
         /** Extra callback after a field was written and saved. */
-        public Builder onFieldUpdated(BiConsumer<String, ServerCommandSource> hook) {
+        public Builder onFieldUpdated(BiConsumer<String, CommandSourceStack> hook) {
             this.onFieldUpdated = hook;
             return this;
         }
@@ -105,11 +105,11 @@ public final class ViaPanelProviders {
 
     private static final class AnnotatedProvider implements ViaPanelProvider {
         private final String modId;
-        private final Text displayName;
-        private final Text panelTitle;
+        private final Component displayName;
+        private final Component panelTitle;
         private final Object config;
-        private final Predicate<ServerCommandSource> permission;
-        private final BiConsumer<String, ServerCommandSource> onFieldUpdated;
+        private final Predicate<CommandSourceStack> permission;
+        private final BiConsumer<String, CommandSourceStack> onFieldUpdated;
         private final Consumer<String> languageHook;
         private final Runnable onReload;
 
@@ -117,7 +117,7 @@ public final class ViaPanelProviders {
             this.modId = b.modId;
             this.displayName = b.displayName;
             this.panelTitle = b.panelTitle != null ? b.panelTitle
-                    : Text.literal(b.displayName.getString() + " Settings");
+                    : Component.literal(b.displayName.getString() + " Settings");
             this.config = b.configInstance;
             this.permission = b.permission;
             this.onFieldUpdated = b.onFieldUpdated;
@@ -131,17 +131,17 @@ public final class ViaPanelProviders {
         }
 
         @Override
-        public Text modDisplayName() {
+        public Component modDisplayName() {
             return displayName.copy();
         }
 
         @Override
-        public Text panelTitle() {
+        public Component panelTitle() {
             return panelTitle.copy();
         }
 
         @Override
-        public boolean hasPermission(ServerCommandSource source) {
+        public boolean hasPermission(CommandSourceStack source) {
             return permission.test(source);
         }
 
@@ -164,15 +164,15 @@ public final class ViaPanelProviders {
         }
 
         @Override
-        public Text fieldDisplayName(String fieldName) {
+        public Component fieldDisplayName(String fieldName) {
             ViaPanelIntrospector.FieldMeta meta = ViaPanelIntrospector.field(configClass(), fieldName);
             return meta != null
                     ? meta.nameFor(ViaPanelApi.getGlobalLanguage()).copy()
-                    : Text.literal(fieldName);
+                    : Component.literal(fieldName);
         }
 
         @Override
-        public Text fieldDescription(String fieldName) {
+        public Component fieldDescription(String fieldName) {
             ViaPanelIntrospector.FieldMeta meta = ViaPanelIntrospector.field(configClass(), fieldName);
             if (meta != null && !meta.descFor(ViaPanelApi.getGlobalLanguage()).getString().isBlank()) {
                 return meta.descFor(ViaPanelApi.getGlobalLanguage()).copy();
@@ -181,7 +181,7 @@ public final class ViaPanelProviders {
         }
 
         @Override
-        public void reload(ServerCommandSource source) {
+        public void reload(CommandSourceStack source) {
             copyFromLoad(config, config.getClass());
             if (onReload != null) {
                 onReload.run();
@@ -189,14 +189,14 @@ public final class ViaPanelProviders {
         }
 
         @Override
-        public void onFieldUpdated(String fieldName, ServerCommandSource source) {
+        public void onFieldUpdated(String fieldName, CommandSourceStack source) {
             if (onFieldUpdated != null) {
                 onFieldUpdated.accept(fieldName, source);
             }
         }
 
         @Override
-        public void applyGlobalLanguage(String languageCode, ServerCommandSource source) {
+        public void applyGlobalLanguage(String languageCode, CommandSourceStack source) {
             if (languageHook != null) {
                 languageHook.accept(languageCode);
             }
