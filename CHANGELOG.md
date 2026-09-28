@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.1.0] - 2026-09-28
+
+### Added
+- Network identity for multi-server setups (Velocity + several Fabric backends): `server_id` and `server_display_name` in `viaPanel.toml`, exposed as `ViaPanelApi.getServerId()` / `getServerDisplayName()`. viaStyle and viaLogium read it, so each backend is named in one place.
+- Empty `server_id` falls back to the server folder name (`lobby`, `arrakis`, ...), which matches the proxy names on a typical stand.
+- `/viapanel` header shows which server the panel belongs to.
+
+### Changed
+- Ported to Minecraft 26.3 (Fabric API 0.161.0+26.3, Loader 0.19.5, Loom 1.17.21).
+
 ## [2.7.2] - 2026-06-27
 
 ### Added
