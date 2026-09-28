@@ -64,7 +64,8 @@ public class ViaPanelCommand {
 
     private static int showMain(CommandContext<CommandSourceStack> ctx) {
         send(ctx, Component.literal(""));
-        send(ctx, Component.literal("  " + tr("installed_mods_title")).withStyle(s -> s.withColor(COLOR_HEADER)));
+        send(ctx, Component.literal("  " + tr("installed_mods_title")).withStyle(s -> s.withColor(COLOR_HEADER))
+                .append(Component.literal(" • " + ViaPanelApi.getServerDisplayName()).withStyle(s -> s.withColor(COLOR_GRAY_DARK))));
         send(ctx, Component.literal(""));
 
         List<ModContainer> mods = FabricLoader.getInstance().getAllMods().stream()

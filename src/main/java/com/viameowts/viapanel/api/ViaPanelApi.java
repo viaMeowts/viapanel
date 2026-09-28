@@ -8,6 +8,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ViaPanelApi {
     private static final Map<String, ViaPanelProvider> PROVIDERS = new ConcurrentHashMap<>();
     private static volatile String globalLanguage = "en";
+    private static volatile String serverId = "server";
+    private static volatile String serverDisplayName = "server";
 
     private ViaPanelApi() {
     }
@@ -58,5 +60,25 @@ public final class ViaPanelApi {
         for (ViaPanelProvider provider : getProviders()) {
             provider.applyGlobalLanguage(globalLanguage, source);
         }
+    }
+
+    /**
+     * Id of this backend in the server network: the name it has in the proxy config
+     * ({@code velocity.toml [servers]}). Stable, lowercase, safe to store in databases.
+     */
+    public static String getServerId() {
+        return serverId;
+    }
+
+    /** Human-readable name of this backend (e.g. "Arrakis"), for chat prefixes and headers. */
+    public static String getServerDisplayName() {
+        return serverDisplayName;
+    }
+
+    public static void setServerIdentity(String id, String displayName) {
+        if (id != null && !id.isBlank()) {
+            serverId = id.trim().toLowerCase();
+        }
+        serverDisplayName = displayName == null || displayName.isBlank() ? serverId : displayName.trim();
     }
 }

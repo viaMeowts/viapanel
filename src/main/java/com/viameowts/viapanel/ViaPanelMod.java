@@ -1,10 +1,14 @@
 package com.viameowts.viapanel;
 
+import com.viameowts.viapanel.api.ViaPanelApi;
 import com.viameowts.viapanel.command.ViaPanelCommand;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.file.Path;
 
 public class ViaPanelMod implements DedicatedServerModInitializer {
     public static final String MOD_ID = "viapanel";
@@ -14,8 +18,18 @@ public class ViaPanelMod implements DedicatedServerModInitializer {
     @Override
     public void onInitializeServer() {
         CONFIG = ViaPanelConfig.load();
+        ViaPanelApi.setServerIdentity(resolveServerId(CONFIG.serverId), CONFIG.serverDisplayName);
         ViaPanelPermissionHelper.init();
         CommandRegistrationCallback.EVENT.register(ViaPanelCommand::register);
-        LOGGER.info("Initialized viaPanel server module.");
+        LOGGER.info("Initialized viaPanel server module (server id: {}).", ViaPanelApi.getServerId());
+    }
+
+    /** Configured id, or the name of the server folder ("lobby", "arrakis", ...) when empty. */
+    static String resolveServerId(String configured) {
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        Path dir = FabricLoader.getInstance().getGameDir().toAbsolutePath().normalize().getFileName();
+        return dir == null ? "server" : dir.toString();
     }
 }

@@ -11,6 +11,10 @@ import java.util.List;
 public final class ViaPanelConfig {
     public String globalLanguagePermission = "viapanel.command.lang";
     public int globalLanguageOpLevel = 3;
+    /** Id of this backend in the network (Velocity server name). Empty = name of the server folder. */
+    public String serverId = "";
+    /** Human-readable name of this backend shown to players. Empty = serverId. */
+    public String serverDisplayName = "";
 
     private static final Path CONFIG_DIR = FabricLoader.getInstance().getConfigDir().resolve("viaPanel");
     private static final Path CONFIG_PATH = CONFIG_DIR.resolve("viaPanel.toml");
@@ -51,6 +55,8 @@ public final class ViaPanelConfig {
                         } catch (NumberFormatException ignored) {
                         }
                     }
+                    case "server_id" -> config.serverId = value;
+                    case "server_display_name" -> config.serverDisplayName = value;
                     default -> {
                     }
                 }
@@ -73,6 +79,13 @@ public final class ViaPanelConfig {
             out.add("");
             out.add("# Vanilla OP fallback level for /viapanel lang (0..4)");
             out.add("global_language_op_level = " + Math.max(0, Math.min(4, globalLanguageOpLevel)));
+            out.add("");
+            out.add("# Network identity of this server, shared by all via mods (viaStyle, viaLogium).");
+            out.add("# server_id must match the server name in velocity.toml [servers]. Empty = server folder name.");
+            out.add("server_id = \"" + escape(serverId) + "\"");
+            out.add("");
+            out.add("# Name shown to players (chat prefix, panel header). Empty = server_id.");
+            out.add("server_display_name = \"" + escape(serverDisplayName) + "\"");
             Files.write(CONFIG_PATH, out);
         } catch (IOException e) {
             ViaPanelMod.LOGGER.warn("[viaPanel] Failed to write config: {}", e.getMessage());

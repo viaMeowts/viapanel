@@ -54,7 +54,18 @@ global_language_permission = "viapanel.command.lang"
 
 # Vanilla OP fallback level for /viapanel lang (0..4)
 global_language_op_level = 3
+
+# Network identity of this server, shared by all via mods (viaStyle, viaLogium).
+# server_id must match the server name in velocity.toml [servers]. Empty = server folder name.
+server_id = ""
+
+# Name shown to players (chat prefix, panel header). Empty = server_id.
+server_display_name = ""
 ```
+
+### Server networks
+
+On a Velocity network every backend runs its own viaPanel. Set `server_id` to the backend's name in `velocity.toml` (or leave it empty when the server folder already has that name) and `server_display_name` to what players should see, e.g. `Арракис`. Other mods read it through `ViaPanelApi.getServerId()` and `ViaPanelApi.getServerDisplayName()`.
 
 ## Build
 
@@ -66,9 +77,9 @@ Requires Java 21+ and a JDK 25 toolchain.
 
 ## Dependencies
 
-- Minecraft 1.21.11
-- Fabric Loader >=0.18.4
-- Fabric API (any version for 1.21.11)
+- Minecraft 26.3
+- Fabric Loader >=0.19.5
+- Fabric API (any version for 26.3)
 - LuckPerms (optional)
 
 ## License
