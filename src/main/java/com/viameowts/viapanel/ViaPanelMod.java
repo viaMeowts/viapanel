@@ -21,6 +21,11 @@ public class ViaPanelMod implements DedicatedServerModInitializer {
         ViaPanelApi.setServerIdentity(resolveServerId(CONFIG.serverId), CONFIG.serverDisplayName);
         ViaPanelPermissionHelper.init();
         CommandRegistrationCallback.EVENT.register(ViaPanelCommand::register);
+        MeridianaAudit.check("panels", "Панели: какие моды подключили свои настройки", () -> {
+            int n = ViaPanelApi.getProviders().size();
+            return java.util.List.of(n == 0 ? "INFO: ни один мод пока не подключил панель настроек"
+                    : "Подключено панелей настроек: " + n);
+        });
         LOGGER.info("Initialized viaPanel server module (server id: {}).", ViaPanelApi.getServerId());
     }
 

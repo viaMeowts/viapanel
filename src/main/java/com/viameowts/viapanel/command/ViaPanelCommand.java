@@ -38,6 +38,8 @@ public class ViaPanelCommand {
                                 CommandBuildContext registryAccess,
                                 Commands.CommandSelection environment) {
         dispatcher.register(Commands.literal("viapanel")
+                // LuckPerms first: node viapanel.command, op level 2 when nobody set it
+                .requires(src -> ViaPanelPermissionHelper.checkPermission(src, "viapanel.command", 2))
                 .executes(ViaPanelCommand::showMain)
                 .then(Commands.argument("mod", StringArgumentType.word())
                         .executes(ViaPanelCommand::showModMain)
@@ -361,6 +363,8 @@ public class ViaPanelCommand {
             provider.onFieldUpdated(fieldName, ctx.getSource());
 
             boolean newVal = !current;
+            com.viameowts.viapanel.MeridianaAudit.event(ctx.getSource().getTextName(), "action", "WARN",
+                    "/viapanel toggle " + modId + " " + fieldName + ": " + current + " -> " + newVal);
             ctx.getSource().sendSuccess(
                     () -> provider.fieldDisplayName(fieldName).copy()
                             .append(Component.literal(": "))
@@ -427,6 +431,8 @@ public class ViaPanelCommand {
             provider.onFieldUpdated(fieldName, ctx.getSource());
 
             String shownValue = meta != null && meta.secret() ? "***" : rawValue;
+            com.viameowts.viapanel.MeridianaAudit.event(ctx.getSource().getTextName(), "action", "WARN",
+                    "/viapanel set " + modId + " " + fieldName + " = " + shownValue);
             ctx.getSource().sendSuccess(
                     () -> provider.fieldDisplayName(fieldName).copy()
                             .append(Component.literal(" = "))
@@ -452,6 +458,7 @@ public class ViaPanelCommand {
         if (provider == null) return 0;
 
         provider.reload(ctx.getSource());
+        com.viameowts.viapanel.MeridianaAudit.action(ctx.getSource().getTextName(), "/viapanel reload " + modId);
         ctx.getSource().sendSuccess(provider::reloadDoneText, false);
         return 1;
     }
@@ -464,6 +471,7 @@ public class ViaPanelCommand {
         }
 
         ViaPanelApi.applyGlobalLanguageToAll(code, ctx.getSource());
+        com.viameowts.viapanel.MeridianaAudit.action(ctx.getSource().getTextName(), "/viapanel lang " + code);
         ctx.getSource().sendSuccess(
                 () -> Component.literal(tr("lang_applied") + ": " + code).withStyle(s -> s.withColor(COLOR_GRAY_LIGHT)),
                 false
@@ -493,6 +501,7 @@ public class ViaPanelCommand {
             return null;
         }
         if (!provider.hasPermission(ctx.getSource())) {
+            com.viameowts.viapanel.MeridianaAudit.event(ctx.getSource().getTextName(), "action", "WARN", "/viapanel: отказ в доступе к панели " + modId);
             ctx.getSource().sendFailure(Component.literal(tr("no_permission_panel") + ": " + modId).withStyle(s -> s.withColor(COLOR_ERROR)));
             return null;
         }

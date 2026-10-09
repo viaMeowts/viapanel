@@ -70,8 +70,11 @@ public final class ViaPanelPermissionHelper {
         }
 
         if (source.getEntity() instanceof ServerPlayer player) {
-            if (hasLuckPermsPermission(player.getUUID(), node)) {
-                return true;
+            // LuckPerms first: an explicit true allows, an explicit false forbids even an operator,
+            // only an unset node falls back to the op level
+            Boolean lp = luckPermsValue(player.getUUID(), node);
+            if (lp != null) {
+                return lp;
             }
         }
 
@@ -83,9 +86,10 @@ public final class ViaPanelPermissionHelper {
                 && source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(opLevel)));
     }
 
-    private static boolean hasLuckPermsPermission(UUID uuid, String permissionNode) {
+    /** true / false when LuckPerms has set the node, null when it has not (or LuckPerms cannot answer). */
+    private static Boolean luckPermsValue(UUID uuid, String permissionNode) {
         if (!luckPermsAvailable) {
-            return false;
+            return null;
         }
 
         try {
@@ -93,17 +97,23 @@ public final class ViaPanelPermissionHelper {
             Object userManager = getUserManagerMethod.invoke(api);
             Object user = getUserMethod.invoke(userManager, uuid);
             if (user == null) {
-                return false;
+                return null;
             }
 
             Object cachedData = getCachedDataMethod.invoke(user);
             Object permissionData = getPermissionDataMethod.invoke(cachedData);
             Object tristate = checkPermissionMethod.invoke(permissionData, permissionNode);
-            Object result = tristateAsBooleanMethod.invoke(tristate);
-            return result instanceof Boolean b && b;
+            String state = String.valueOf(tristate);
+            if ("TRUE".equalsIgnoreCase(state)) {
+                return Boolean.TRUE;
+            }
+            if ("FALSE".equalsIgnoreCase(state)) {
+                return Boolean.FALSE;
+            }
+            return null;
         } catch (Throwable t) {
             ViaPanelMod.LOGGER.debug("[viaPanel] LP permission check failed: {}", t.getMessage());
-            return false;
+            return null;
         }
     }
 }
